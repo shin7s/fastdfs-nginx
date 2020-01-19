@@ -1,0 +1,29 @@
+# sample of tracker.conf
+# groupn will be dynamic added by shell script
+
+upstream fdfs_${GROUP_N} {
+    #should be loop
+    server ${STORAGE_IP}:${STORAGE_PORT} weight=1 max_fails=2 fail_timeout=30s;
+}
+
+server {
+    listen       8000 ;
+    # server_name  _ ;
+
+    location / {
+        root   html;
+        index  index.html index.htm;
+        proxy_pass http://fdfs_${GROUP_N};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    #Access permission of clean cache
+    location ~/purge(/*) {
+        allow 127.0.0.1;
+        # allow ip/24
+        deny all;
+        proxy_cache_purge http-cache $1$is_args$args;
+    }
+}

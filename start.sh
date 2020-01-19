@@ -1,6 +1,9 @@
 #!/bin/bash
 #set -e
 
+#Added by shin 获取当前容器的IP地址
+HOSTIP=$(cat /etc/hosts | sed -n -e "s/$HOSTNAME//p" -e "s/^\s*//" -e "s/\s*$//p")
+
 GROUP_NAME=${GROUP_NAME:-group1}
 if [ -n "$GET_TRACKER_SERVER" ]; then
     export TRACKER_SERVER=$(eval $GET_TRACKER_SERVER)
@@ -31,6 +34,9 @@ function fdfs_set () {
     
     sed -i "s|group_name=.*$|group_name=${GROUP_NAME}|g" /etc/fdfs/storage.conf
     
+    # Modifid by shin 模块作用连接Nginx
+    sed -i "s|group_name=.*$|group_name=${GROUP_NAME}|g" /etc/fdfs/mod_fastdfs.conf #模块配置
+
     FASTDFS_LOG_FILE="${FASTDFS_BASE_PATH}/logs/${FASTDFS_MODE}d.log"
     PID_NUMBER="${FASTDFS_BASE_PATH}/data/fdfs_${FASTDFS_MODE}d.pid"
     
@@ -51,23 +57,24 @@ function nginx_set () {
     /usr/local/nginx/sbin/nginx
 }
 
+#应该修改为keepalive?
 function health_check() {
     if [ $HOSTNAME = "localhost.localdomain" ]; then
         return 0
     fi
-    # Storage OFFLINE, restart storage.
+    # Storage OFFLINE, restart storage
     monitor_log=/tmp/monitor.log
     check_log=/tmp/health_check.log
     while true; do
         fdfs_monitor /etc/fdfs/client.conf 1>$monitor_log 2>&1
-        cat $monitor_log|grep $HOSTNAME > $check_log 2>&1
+        cat $monitor_log|grep $HOSTIP > $check_log 2>&1
         error_log=$(egrep "OFFLINE" "$check_log")
         if [ ! -z "$error_log" ]; then
             cat /dev/null > "$FASTDFS_LOG_FILE"
             fdfs_${FASTDFS_MODE}d /etc/fdfs/${FASTDFS_MODE}.conf stop
             fdfs_${FASTDFS_MODE}d /etc/fdfs/${FASTDFS_MODE}.conf start
         fi
-        sleep 10
+        sleep 30
     done
 }
 
